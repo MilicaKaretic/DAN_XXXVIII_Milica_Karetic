@@ -15,6 +15,8 @@ namespace DAN_XXXVII_Milica_Karetic
         public static List<Thread> trucks = new List<Thread>();
         public static SemaphoreSlim semaphore = new SemaphoreSlim(2, 2);
 
+        public static CountdownEvent countdown = new CountdownEvent(10);
+
         static int restartCount = 0, enterCount = 0, count = 0;
 
         /// <summary>
@@ -125,6 +127,7 @@ namespace DAN_XXXVII_Milica_Karetic
             Console.WriteLine(Thread.CurrentThread.Name + " is loaded...");
 
             semaphore.Release();
+            countdown.Signal();
         }
 
         /// <summary>
@@ -147,14 +150,7 @@ namespace DAN_XXXVII_Milica_Karetic
             }
 
             //wait all trucks to load
-            lock (locker)
-            {
-                count++;
-            }
-            while (count < 10)
-            {
-                Thread.Sleep(0);
-            }
+            countdown.Wait();
 
             //set route for each truck
             Console.WriteLine(Thread.CurrentThread.Name + " will drive on route " + route);
