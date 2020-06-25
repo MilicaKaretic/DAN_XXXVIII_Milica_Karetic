@@ -35,19 +35,15 @@ namespace DAN_XXXVII_Milica_Karetic
         public static void GenerateNumbers()
         {
             int num;
-
-            lock (fileName)
+            using (StreamWriter sw = File.CreateText(fileName))
             {
-                using (StreamWriter sw = File.CreateText(fileName))
+                for (int i = 0; i < 1000; i++)
                 {
-                    for (int i = 0; i < 1000; i++)
-                    {
-                        num = rnd.Next(1, 5001);
-                        sw.WriteLine(num);
-                    }
+                    num = rnd.Next(1, 5001);
+                    sw.WriteLine(num);
                 }
-                eventFile.Set();
             }
+            eventFile.Set();
         }
 
         /// <summary>
@@ -58,51 +54,48 @@ namespace DAN_XXXVII_Milica_Karetic
             Console.WriteLine("Manager is waiting for routes...");
             //temporary list for all numbers from file
             List<int> tempList = new List<int>();
-            lock (fileName)
+
+            int num = rnd.Next(1, 3001);
+            Thread.Sleep(num);
+
+            eventFile.WaitOne();
+
+            using (StreamReader sr = File.OpenText(fileName))
             {
-                int num = rnd.Next(1, 3001);
-                Thread.Sleep(num);
-
-                eventFile.WaitOne();
-
-                using (StreamReader sr = File.OpenText(fileName))
+                string line;
+                while ((line = sr.ReadLine()) != null)
                 {
-                    string line;
-                    while ((line = sr.ReadLine()) != null)
-                    {
-                        if (int.Parse(line) % 3 == 0)
-                            tempList.Add(int.Parse(line));
-                    }
+                    if (int.Parse(line) % 3 == 0)
+                        tempList.Add(int.Parse(line));
                 }
-
-                //sort list ascending
-                tempList.Sort();
-
-                //get distinct values from temporary list
-                IEnumerable<int> distinctRoutes = tempList.Distinct();
-                int a = 0;
-                foreach (int route in distinctRoutes)
-                {
-                    if (a < 10)
-                    {
-                        //add 10 best routes to bestRoutes list (first 10 routes from sorted list)
-                        bestRoutes.Add(route);
-                        a++;
-                    }
-                    else
-                        break;
-                }
-
-                Console.WriteLine("Routes picked. You can start loading. After loading you can go.");
-                Console.WriteLine("Best routes:");
-                for (int i = 0; i < bestRoutes.Count; i++)
-                {
-                    Console.Write(bestRoutes[i] + " ");
-                }
-                Console.WriteLine();
-                Console.WriteLine();
             }
 
+            //sort list ascending
+            tempList.Sort();
+
+            //get distinct values from temporary list
+            IEnumerable<int> distinctRoutes = tempList.Distinct();
+            int a = 0;
+            foreach (int route in distinctRoutes)
+            {
+                if (a < 10)
+                {
+                    //add 10 best routes to bestRoutes list (first 10 routes from sorted list)
+                    bestRoutes.Add(route);
+                    a++;
+                }
+                else
+                    break;
+            }
+
+            Console.WriteLine("Routes picked. You can start loading. After loading you can go.");
+            Console.WriteLine("Best routes:");
+            for (int i = 0; i < bestRoutes.Count; i++)
+            {
+                Console.Write(bestRoutes[i] + " ");
+            }
+            Console.WriteLine();
+            Console.WriteLine();
         }
 
 
@@ -114,18 +107,15 @@ namespace DAN_XXXVII_Milica_Karetic
         {
             while (true)
             {
-                lock (locker)
+                if (countdownLoading.CurrentCount == 0)
                 {
-                    if (countdownLoading.CurrentCount == 0)
-                    {
-                        countdownLoading.Wait();
-                        Thread.Sleep(0);
-                    }                     
-                    else
-                    {
-                        countdownLoading.Signal();
-                        break;
-                    }
+                    countdownLoading.Wait();
+                    Thread.Sleep(0);
+                }
+                else
+                {
+                    countdownLoading.Signal();
+                    break;
                 }
             }
         }
@@ -165,7 +155,7 @@ namespace DAN_XXXVII_Milica_Karetic
 
             LoadTrucks(loadingTime);
 
-            lock(locker)
+            lock (locker)
             {
                 enterThreadCount--;
                 if (enterThreadCount == 0)
@@ -173,7 +163,7 @@ namespace DAN_XXXVII_Milica_Karetic
                     countdownLoading.Reset(2);
                 }
             }
-            
+
             //wait all trucks to load
             countdown.Wait();
 
