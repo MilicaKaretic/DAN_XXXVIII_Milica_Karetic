@@ -10,14 +10,24 @@ namespace DAN_XXXVII_Milica_Karetic
     {
         private static object locker = new object();
         static Random rnd = new Random();
-        public static string fileName = "FileRoutes.txt";
-        public static List<int> bestRoutes = new List<int>(10);
-        public static List<Thread> trucks = new List<Thread>();
-        public static SemaphoreSlim semaphore = new SemaphoreSlim(2, 2);
+        private static string fileName = "FileRoutes.txt";
 
-        public static CountdownEvent countdown = new CountdownEvent(10);
+        private static List<int> bestRoutes = new List<int>(10);
+        private static List<Thread> trucks = new List<Thread>();
+        private static SemaphoreSlim semaphore = new SemaphoreSlim(2, 2);
 
-        static int restartCount = 0, enterCount = 0, count = 0;
+        /// <summary>
+        /// Wait all trucks to load and then go
+        /// </summary>
+        private static CountdownEvent countdown = new CountdownEvent(10);
+        /// <summary>
+        /// Load trucks two by two
+        /// </summary>
+        private static CountdownEvent countdownLoading = new CountdownEvent(2);
+
+        private static AutoResetEvent eventFile = new AutoResetEvent(false);
+
+        private static int enterThreadCount = 0;
 
         /// <summary>
         /// Generate 1000 random numbers and write them to file
@@ -36,7 +46,7 @@ namespace DAN_XXXVII_Milica_Karetic
                         sw.WriteLine(num);
                     }
                 }
-                Monitor.Pulse(fileName);
+                eventFile.Set();
             }
         }
 
@@ -50,7 +60,11 @@ namespace DAN_XXXVII_Milica_Karetic
             List<int> tempList = new List<int>();
             lock (fileName)
             {
-                Monitor.Wait(fileName, 3000);
+                int num = rnd.Next(1, 3001);
+                Thread.Sleep(num);
+
+                eventFile.WaitOne();
+
                 using (StreamReader sr = File.OpenText(fileName))
                 {
                     string line;
@@ -95,18 +109,21 @@ namespace DAN_XXXVII_Milica_Karetic
         /// <summary>
         /// Method that ensure trucks to load two by two
         /// </summary>
-        public static void TwoTrucksLoading()
+        /// <param name="countdownLoading">Countdown for signalization</param>
+        public static void TwoTrucksLoading(CountdownEvent countdownLoading)
         {
             while (true)
             {
                 lock (locker)
                 {
-                    enterCount++;
-                    if (enterCount > 2)
+                    if (countdownLoading.CurrentCount == 0)
+                    {
+                        countdownLoading.Wait();
                         Thread.Sleep(0);
+                    }                     
                     else
                     {
-                        restartCount++;
+                        countdownLoading.Signal();
                         break;
                     }
                 }
@@ -137,18 +154,26 @@ namespace DAN_XXXVII_Milica_Karetic
         public static void Loading(object route)
         {
             //call method
-            TwoTrucksLoading();
+            TwoTrucksLoading(countdownLoading);
+
+            lock (locker)
+            {
+                enterThreadCount++;
+            }
 
             int loadingTime = rnd.Next(500, 5001);
 
             LoadTrucks(loadingTime);
 
-            restartCount--;
-            if (restartCount == 0)
+            lock(locker)
             {
-                enterCount = 0;
+                enterThreadCount--;
+                if (enterThreadCount == 0)
+                {
+                    countdownLoading.Reset(2);
+                }
             }
-
+            
             //wait all trucks to load
             countdown.Wait();
 
